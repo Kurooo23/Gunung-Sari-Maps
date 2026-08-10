@@ -189,7 +189,7 @@ export default function Login() {
           <div className="login-visual-content">
             <span className="login-eyebrow">UNTUK PUSKESMAS KELURAHAN GUNUNG SARI ULU</span>
             <h1 className="login-headline">
-              Halo, <em>Nakes.</em>
+              Selamat <em>Datang.</em>
             </h1>
             <p className="login-tagline">
               Terima kasih sudah menjaga tumbuh kembang anak-anak di wilayahmu.

@@ -168,7 +168,7 @@ export default function InputPage() {
         </div>
         <p className="info-note">
           Data yang disimpan akan otomatis muncul di halaman peta.
-          Pastikan data sesuai dengan hasil pencatatan posyandu terbaru.
+          Pastikan data sesuai dengan hasil pencatatan terbaru.
         </p>
       </div>
     </div>
