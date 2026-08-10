@@ -253,6 +253,95 @@ export async function submitCaseData({ rtNumber, diseaseSlug, caseCount, period,
   }
 }
 
+/**
+ * Ambil daftar entri kasus (mentah, dengan id) untuk satu jenis kasus,
+ * dipakai untuk menampilkan tabel data tersimpan di Input Page
+ * (mendukung Edit & Hapus).
+ */
+export async function fetchCaseEntries({ kelurahan, diseaseSlug }) {
+  if (!isSupabaseConfigured()) return [];
+
+  const caseTable = getCaseTableName(diseaseSlug || "stunting");
+
+  try {
+    const caseTableExists = await tableExists(caseTable);
+    if (!caseTableExists) return [];
+
+    let query = supabase
+      .from(caseTable)
+      .select("id, rt_number, case_count, period, notes, updated_at")
+      .order("period", { ascending: false })
+      .order("rt_number", { ascending: true });
+
+    if (kelurahan) {
+      query = query.eq("kelurahan", kelurahan);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.error("[DataService] Error fetching case entries:", err.message);
+    return [];
+  }
+}
+
+/**
+ * Update satu entri kasus berdasarkan id (baris case_<slug> tertentu).
+ * Perlu supabase-add-delete-policies.sql? Tidak, UPDATE policy sudah
+ * ada dari supabase-compat-mapping.sql. File tambahan hanya untuk DELETE.
+ */
+export async function updateCaseData(id, diseaseSlug, { rtNumber, caseCount, period, notes }) {
+  if (!isSupabaseConfigured()) {
+    return {
+      success: false,
+      error: "Supabase belum dikonfigurasi. Tambahkan URL & key di file .env",
+    };
+  }
+
+  const caseTable = getCaseTableName(diseaseSlug || "stunting");
+
+  try {
+    const { error } = await supabase
+      .from(caseTable)
+      .update({
+        rt_number: rtNumber,
+        case_count: Number(caseCount),
+        period,
+        notes: notes || null,
+      })
+      .eq("id", id);
+
+    if (error) throw error;
+    return { success: true, error: null };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Hapus satu entri kasus berdasarkan id.
+ * Butuh policy DELETE di Supabase — jalankan supabase-add-delete-policies.sql.
+ */
+export async function deleteCaseData(id, diseaseSlug) {
+  if (!isSupabaseConfigured()) {
+    return {
+      success: false,
+      error: "Supabase belum dikonfigurasi. Tambahkan URL & key di file .env",
+    };
+  }
+
+  const caseTable = getCaseTableName(diseaseSlug || "stunting");
+
+  try {
+    const { error } = await supabase.from(caseTable).delete().eq("id", id);
+    if (error) throw error;
+    return { success: true, error: null };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
 export async function submitStuntingData({ rtNumber, stuntingCount, period, notes, kelurahan }) {
   return submitCaseData({
     rtNumber,
