@@ -64,6 +64,9 @@ export default function MapPage() {
     if (!geoJsonData?.features) return null;
     const features = geoJsonData.features;
     const totalRT = features.length;
+    const rtWithCases = features.filter(
+      (feature) => Number(feature.properties.case_count ?? feature.properties.stunting_count ?? 0) > 0
+    ).length;
     const totalCases = features.reduce(
       (sum, feature) => sum + Number(feature.properties.case_count ?? feature.properties.stunting_count ?? 0),
       0
@@ -77,7 +80,7 @@ export default function MapPage() {
       const count = Number(feature.properties.case_count ?? feature.properties.stunting_count ?? 0);
       return count >= 3;
     }).length;
-    return { totalRT, totalCases, rtHijau, rtKuning, rtMerah };
+    return { totalRT, rtWithCases, totalCases, rtHijau, rtKuning, rtMerah };
   }, [geoJsonData]);
 
   if (!geoJsonData || !stats) {
@@ -131,7 +134,7 @@ export default function MapPage() {
           </div>
           <div className="stat-grid">
             <div className="stat-card">
-              <span className="stat-number">{stats.totalRT}</span>
+              <span className="stat-number">{stats.rtWithCases}</span>
               <span className="stat-label">Total RT</span>
             </div>
             <div className="stat-card">
