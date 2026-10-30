@@ -384,6 +384,19 @@
   letter-spacing: 0.01em;
 }
 
+.login-version {
+  position: absolute;
+  right: 28px;
+  bottom: 20px;
+  z-index: 1;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #9aa1b5;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
 /* ============================================================
    Responsif
    ============================================================ */
@@ -410,13 +423,19 @@
   }
 
   .login-panel {
-    padding: 28px 24px;
+    padding: 28px 24px 44px;
     align-items: flex-start;
     padding-top: 36px;
   }
 
   .login-signature {
     display: none;
+  }
+
+  .login-version {
+    right: 18px;
+    bottom: 12px;
+    font-size: 0.68rem;
   }
 }
 

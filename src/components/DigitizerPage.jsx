@@ -1,5 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { MapContainer, ImageOverlay, Polygon, CircleMarker, Polyline, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import {
+  MapContainer,
+  ImageOverlay,
+  Polygon,
+  CircleMarker,
+  Polyline,
+  Tooltip,
+  useMap,
+  useMapEvents,
+} from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import mapReference from "../assets/Peta Batas RT_page-0001.jpg";
 
@@ -12,17 +21,17 @@ function FitMapBounds() {
   const map = useMap();
 
   useEffect(() => {
-    const fitMap = () => {
+    const fitMapToReferenceBounds = () => {
       map.invalidateSize();
       map.fitBounds(imageBounds, { padding: [0, 0], animate: false });
     };
 
-    const frame = requestAnimationFrame(fitMap);
-    window.addEventListener("resize", fitMap);
+    const animationFrameId = requestAnimationFrame(fitMapToReferenceBounds);
+    window.addEventListener("resize", fitMapToReferenceBounds);
 
     return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("resize", fitMap);
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener("resize", fitMapToReferenceBounds);
     };
   }, [map]);
 
@@ -31,10 +40,13 @@ function FitMapBounds() {
 
 function MapClickHandler({ onAddVertex }) {
   useMapEvents({
-    click: (e) => onAddVertex([e.latlng.lng, e.latlng.lat]),
-    mousemove: (e) => {
-      const el = document.getElementById("coord-display");
-      if (el) el.textContent = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+    click: (mapClickEvent) =>
+      onAddVertex([mapClickEvent.latlng.lng, mapClickEvent.latlng.lat]),
+    mousemove: (mapMoveEvent) => {
+      const coordinateDisplayElement = document.getElementById("coord-display");
+      if (coordinateDisplayElement) {
+        coordinateDisplayElement.textContent = `${mapMoveEvent.latlng.lat.toFixed(6)}, ${mapMoveEvent.latlng.lng.toFixed(6)}`;
+      }
     },
   });
   return null;
@@ -48,87 +60,106 @@ export default function DigitizerPage() {
   const [exportText, setExportText] = useState("");
   const textareaRef = useRef(null);
 
-  const rtStr = String(rtNumber).padStart(2, "0");
+  const formattedRTNumber = String(rtNumber).padStart(2, "0");
 
-  const addVertex = useCallback((coord) => {
-    setVertices((prev) => [...prev, coord]);
+  const addVertex = useCallback((coordinate) => {
+    setVertices((previousVertices) => [...previousVertices, coordinate]);
   }, []);
 
   const undoVertex = useCallback(() => {
-    setVertices((prev) => prev.slice(0, -1));
+    setVertices((previousVertices) => previousVertices.slice(0, -1));
   }, []);
 
   const completePolygon = useCallback(() => {
     if (vertices.length < 3) return;
-    const coords = [...vertices, vertices[0]];
-    setCompletedRTs((prev) => ({
-      ...prev,
-      [rtStr]: {
+    const closedRingCoordinates = [...vertices, vertices[0]];
+    setCompletedRTs((previousCompletedRTs) => ({
+      ...previousCompletedRTs,
+      [formattedRTNumber]: {
         type: "Feature",
-        properties: { rt_number: rtStr, stunting_count: 0, kelurahan: "Gunung Sari Ulu" },
-        geometry: { type: "Polygon", coordinates: [coords] },
+        properties: {
+          rt_number: formattedRTNumber,
+          stunting_count: 0,
+          kelurahan: "Gunung Sari Ulu",
+        },
+        geometry: { type: "Polygon", coordinates: [closedRingCoordinates] },
       },
     }));
     setVertices([]);
-    setRtNumber((prev) => (prev >= 41 ? 1 : prev + 1));
-  }, [vertices, rtStr]);
+    setRtNumber((previousRTNumber) =>
+      previousRTNumber >= 41 ? 1 : previousRTNumber + 1
+    );
+  }, [vertices, formattedRTNumber]);
 
   const clearVertices = useCallback(() => setVertices([]), []);
 
-  const editRT = useCallback((num) => {
-    const key = String(num).padStart(2, "0");
-    const existing = completedRTs[key];
-    if (!existing) return;
-    setRtNumber(parseInt(num));
-    setVertices(existing.geometry.coordinates[0].slice(0, -1));
-    setCompletedRTs((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-  }, [completedRTs]);
+  const editRT = useCallback(
+    (targetRTNumber) => {
+      const rtKey = String(targetRTNumber).padStart(2, "0");
+      const existingFeature = completedRTs[rtKey];
+      if (!existingFeature) return;
 
-  const deleteRT = useCallback((num) => {
-    const key = String(num).padStart(2, "0");
-    setCompletedRTs((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
+      setRtNumber(parseInt(targetRTNumber, 10));
+      setVertices(existingFeature.geometry.coordinates[0].slice(0, -1));
+      setCompletedRTs((previousCompletedRTs) => {
+        const nextCompletedRTs = { ...previousCompletedRTs };
+        delete nextCompletedRTs[rtKey];
+        return nextCompletedRTs;
+      });
+    },
+    [completedRTs]
+  );
+
+  const deleteRT = useCallback((targetRTNumber) => {
+    const rtKey = String(targetRTNumber).padStart(2, "0");
+    setCompletedRTs((previousCompletedRTs) => {
+      const nextCompletedRTs = { ...previousCompletedRTs };
+      delete nextCompletedRTs[rtKey];
+      return nextCompletedRTs;
     });
   }, []);
 
   const exportGeoJson = useCallback(() => {
-    const rts = Object.keys(completedRTs).sort((a, b) => parseInt(a) - parseInt(b));
-    const geojson = {
+    const sortedRTKeys = Object.keys(completedRTs).sort(
+      (firstRT, secondRT) => parseInt(firstRT, 10) - parseInt(secondRT, 10)
+    );
+    const geoJsonFeatureCollection = {
       type: "FeatureCollection",
-      features: rts.map((rt) => completedRTs[rt]),
+      features: sortedRTKeys.map((rtKey) => completedRTs[rtKey]),
     };
-    const text = `const rtGeoJson = ${JSON.stringify(geojson, null, 2)};\n\nexport default rtGeoJson;\n`;
-    setExportText(text);
+    const formattedOutput = `const rtGeoJson = ${JSON.stringify(geoJsonFeatureCollection, null, 2)};\n\nexport default rtGeoJson;\n`;
+    setExportText(formattedOutput);
   }, [completedRTs]);
 
   const copyToClipboard = useCallback(() => {
     if (!exportText) exportGeoJson();
-    navigator.clipboard.writeText(exportText || "").then(() => alert("Copied!"));
+    navigator.clipboard
+      .writeText(exportText || "")
+      .then(() => alert("Copied!"));
   }, [exportText, exportGeoJson]);
 
   const completedCount = Object.keys(completedRTs).length;
-  const completedList = Object.keys(completedRTs).sort((a, b) => parseInt(a) - parseInt(b));
+  const completedList = Object.keys(completedRTs).sort(
+    (firstRT, secondRT) => parseInt(firstRT, 10) - parseInt(secondRT, 10)
+  );
 
   // Keyboard shortcuts
   useEffect(() => {
-    const handler = (e) => {
-      if (e.key === "Enter" && !e.target.closest("textarea, input")) {
-        e.preventDefault();
+    const handleKeyDown = (keyboardEvent) => {
+      if (
+        keyboardEvent.key === "Enter" &&
+        !keyboardEvent.target.closest("textarea, input")
+      ) {
+        keyboardEvent.preventDefault();
         completePolygon();
       }
-      if (e.key === "z" && e.ctrlKey) {
-        e.preventDefault();
+      if (keyboardEvent.key === "z" && keyboardEvent.ctrlKey) {
+        keyboardEvent.preventDefault();
         undoVertex();
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [completePolygon, undoVertex]);
 
   return (
@@ -136,8 +167,14 @@ export default function DigitizerPage() {
       {/* Panel */}
       <div
         style={{
-          width: 340, background: "#1a1a2e", color: "#eee", padding: 16,
-          overflowY: "auto", display: "flex", flexDirection: "column", gap: 12,
+          width: 340,
+          background: "#1a1a2e",
+          color: "#eee",
+          padding: 16,
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
           flexShrink: 0,
         }}
       >
@@ -153,39 +190,75 @@ export default function DigitizerPage() {
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span style={{ fontSize: "0.85rem", minWidth: 50 }}>RT #:</span>
           <input
-            type="number" min={1} max={41} value={rtNumber}
-            onChange={(e) => setRtNumber(Math.max(1, Math.min(41, parseInt(e.target.value) || 1)))}
+            type="number"
+            min={1}
+            max={41}
+            value={rtNumber}
+            onChange={(event) =>
+              setRtNumber(
+                Math.max(1, Math.min(41, parseInt(event.target.value, 10) || 1))
+              )
+            }
             style={{
-              width: 70, background: "#16213e", color: "#eee",
-              border: "1px solid #333", padding: "6px 10px", borderRadius: 4,
+              width: 70,
+              background: "#16213e",
+              color: "#eee",
+              border: "1px solid #333",
+              padding: "6px 10px",
+              borderRadius: 4,
             }}
           />
           <button
-            onClick={() => setRtNumber((p) => (p <= 1 ? 41 : p - 1))}
-            style={btnStyle}
-          >◄</button>
+            onClick={() =>
+              setRtNumber((previousRTNumber) =>
+                previousRTNumber <= 1 ? 41 : previousRTNumber - 1
+              )
+            }
+            style={primaryButtonStyle}
+          >
+            ◄
+          </button>
           <button
-            onClick={() => setRtNumber((p) => (p >= 41 ? 1 : p + 1))}
-            style={btnStyle}
-          >►</button>
+            onClick={() =>
+              setRtNumber((previousRTNumber) =>
+                previousRTNumber >= 41 ? 1 : previousRTNumber + 1
+              )
+            }
+            style={primaryButtonStyle}
+          >
+            ►
+          </button>
         </div>
 
         {/* Actions */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button onClick={completePolygon} disabled={vertices.length < 3}
-            style={{ ...btnStyle, background: vertices.length >= 3 ? "#18aa3b" : "#444" }}>
+          <button
+            onClick={completePolygon}
+            disabled={vertices.length < 3}
+            style={{
+              ...primaryButtonStyle,
+              background: vertices.length >= 3 ? "#18aa3b" : "#444",
+            }}
+          >
             Selesai ({vertices.length} vtx)
           </button>
-          <button onClick={undoVertex} style={btnStyle}>Undo</button>
-          <button onClick={clearVertices} style={btnStyle}>Clear</button>
+          <button onClick={undoVertex} style={primaryButtonStyle}>
+            Undo
+          </button>
+          <button onClick={clearVertices} style={primaryButtonStyle}>
+            Clear
+          </button>
         </div>
 
         {/* Opacity */}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span style={{ fontSize: "0.85rem", minWidth: 60 }}>Opacity:</span>
           <input
-            type="range" min={0} max={100} value={overlayOpacity * 100}
-            onChange={(e) => setOverlayOpacity(e.target.value / 100)}
+            type="range"
+            min={0}
+            max={100}
+            value={overlayOpacity * 100}
+            onChange={(event) => setOverlayOpacity(event.target.value / 100)}
             style={{ flex: 1 }}
           />
           <span style={{ fontSize: "0.8rem" }}>{Math.round(overlayOpacity * 100)}%</span>
@@ -193,10 +266,16 @@ export default function DigitizerPage() {
 
         {/* Cursor coords */}
         <div style={{ borderTop: "1px solid #333", paddingTop: 10 }}>
-          <div style={{
-            fontFamily: "monospace", fontSize: "0.8rem", color: "#7fdbca",
-            background: "#16213e", padding: 6, borderRadius: 4,
-          }}>
+          <div
+            style={{
+              fontFamily: "monospace",
+              fontSize: "0.8rem",
+              color: "#7fdbca",
+              background: "#16213e",
+              padding: 6,
+              borderRadius: 4,
+            }}
+          >
             <span id="coord-display">Hover di peta...</span>
           </div>
         </div>
@@ -206,24 +285,46 @@ export default function DigitizerPage() {
           <h3 style={{ fontSize: "0.9rem", color: "#7fdbca", margin: "0 0 6px 0" }}>
             Selesai: {completedCount}/41
           </h3>
-          <div style={{
-            maxHeight: 220, overflowY: "auto", fontSize: "0.8rem",
-            background: "#16213e", borderRadius: 4, padding: 8,
-          }}>
+          <div
+            style={{
+              maxHeight: 220,
+              overflowY: "auto",
+              fontSize: "0.8rem",
+              background: "#16213e",
+              borderRadius: 4,
+              padding: 8,
+            }}
+          >
             {completedList.length === 0 ? (
               <span style={{ color: "#666" }}>Belum ada RT.</span>
             ) : (
-              completedList.map((rt) => (
-                <div key={rt} style={{
-                  display: "flex", justifyContent: "space-between",
-                  padding: "3px 0", borderBottom: "1px solid #222", alignItems: "center",
-                }}>
-                  <span>RT {rt} ({completedRTs[rt].geometry.coordinates[0].length - 1} vtx)</span>
+              completedList.map((rtKey) => (
+                <div
+                  key={rtKey}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "3px 0",
+                    borderBottom: "1px solid #222",
+                    alignItems: "center",
+                  }}
+                >
+                  <span>
+                    RT {rtKey} ({completedRTs[rtKey].geometry.coordinates[0].length - 1} vtx)
+                  </span>
                   <div style={{ display: "flex", gap: 4 }}>
-                    <button onClick={() => editRT(rt)}
-                      style={{ ...btnSmall, background: "#0f3460" }}>Edit</button>
-                    <button onClick={() => deleteRT(rt)}
-                      style={{ ...btnSmall, background: "#8b0000" }}>×</button>
+                    <button
+                      onClick={() => editRT(rtKey)}
+                      style={{ ...smallButtonStyle, background: "#0f3460" }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteRT(rtKey)}
+                      style={{ ...smallButtonStyle, background: "#8b0000" }}
+                    >
+                      ×
+                    </button>
                   </div>
                 </div>
               ))
@@ -234,18 +335,32 @@ export default function DigitizerPage() {
         {/* Export */}
         <div style={{ borderTop: "1px solid #333", paddingTop: 10 }}>
           <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <button onClick={exportGeoJson} style={{ ...btnStyle, background: "#e94560" }}>
+            <button
+              onClick={exportGeoJson}
+              style={{ ...primaryButtonStyle, background: "#e94560" }}
+            >
               Export
             </button>
-            <button onClick={copyToClipboard} style={btnStyle}>Copy</button>
+            <button onClick={copyToClipboard} style={primaryButtonStyle}>
+              Copy
+            </button>
           </div>
           <textarea
-            ref={textareaRef} value={exportText} readOnly
+            ref={textareaRef}
+            value={exportText}
+            readOnly
             placeholder="Klik Export..."
             style={{
-              width: "100%", height: 140, background: "#16213e", color: "#7fdbca",
-              border: "1px solid #333", borderRadius: 4, padding: 8,
-              fontFamily: "monospace", fontSize: "0.7rem", resize: "vertical",
+              width: "100%",
+              height: 140,
+              background: "#16213e",
+              color: "#7fdbca",
+              border: "1px solid #333",
+              borderRadius: 4,
+              padding: 8,
+              fontFamily: "monospace",
+              fontSize: "0.7rem",
+              resize: "vertical",
             }}
           />
         </div>
@@ -258,40 +373,58 @@ export default function DigitizerPage() {
         style={{ flex: 1, minWidth: 0, minHeight: 0, zIndex: 1 }}
         zoomControl={true}
       >
-        <ImageOverlay url={mapReference} bounds={imageBounds} opacity={overlayOpacity} zIndex={0} />
+        <ImageOverlay
+          url={mapReference}
+          bounds={imageBounds}
+          opacity={overlayOpacity}
+          zIndex={0}
+        />
         <MapClickHandler onAddVertex={addVertex} />
 
         {/* Completed polygons */}
-        {completedList.map((rt) => {
-          const coords = completedRTs[rt].geometry.coordinates[0].slice(0, -1);
-          const latlngs = coords.map((c) => [c[1], c[0]]);
+        {completedList.map((rtKey) => {
+          const ringCoordinates = completedRTs[rtKey].geometry.coordinates[0].slice(0, -1);
+          const polygonPositions = ringCoordinates.map(([longitude, latitude]) => [
+            latitude,
+            longitude,
+          ]);
           return (
             <Polygon
-              key={rt}
-              positions={latlngs}
-              pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#18aa3b", fillOpacity: 0.35 }}
+              key={rtKey}
+              positions={polygonPositions}
+              pathOptions={{
+                color: "#ffffff",
+                weight: 2,
+                fillColor: "#18aa3b",
+                fillOpacity: 0.35,
+              }}
             >
               <Tooltip permanent direction="center" className="rt-label">
-                {rt}
+                {rtKey}
               </Tooltip>
             </Polygon>
           );
         })}
 
         {/* Current vertices */}
-        {vertices.map((v, i) => (
+        {vertices.map(([longitude, latitude], vertexIndex) => (
           <CircleMarker
-            key={i}
-            center={[v[1], v[0]]}
+            key={vertexIndex}
+            center={[latitude, longitude]}
             radius={5}
-            pathOptions={{ color: "#fff", fillColor: "#e94560", weight: 1, fillOpacity: 1 }}
+            pathOptions={{
+              color: "#fff",
+              fillColor: "#e94560",
+              weight: 1,
+              fillOpacity: 1,
+            }}
           />
         ))}
 
         {/* Current polyline */}
         {vertices.length > 1 && (
           <Polyline
-            positions={vertices.map((v) => [v[1], v[0]])}
+            positions={vertices.map(([longitude, latitude]) => [latitude, longitude])}
             pathOptions={{ color: "#e94560", weight: 2, dashArray: "6,4" }}
           />
         )}
@@ -302,12 +435,21 @@ export default function DigitizerPage() {
   );
 }
 
-const btnStyle = {
-  background: "#0f3460", color: "#eee", border: "none",
-  padding: "8px 14px", borderRadius: 4, cursor: "pointer", fontSize: "0.85rem",
+const primaryButtonStyle = {
+  background: "#0f3460",
+  color: "#eee",
+  border: "none",
+  padding: "8px 14px",
+  borderRadius: 4,
+  cursor: "pointer",
+  fontSize: "0.85rem",
 };
 
-const btnSmall = {
-  color: "#eee", border: "none", padding: "2px 8px",
-  borderRadius: 3, cursor: "pointer", fontSize: "0.75rem",
+const smallButtonStyle = {
+  color: "#eee",
+  border: "none",
+  padding: "2px 8px",
+  borderRadius: 3,
+  cursor: "pointer",
+  fontSize: "0.75rem",
 };

@@ -19,6 +19,15 @@ function ClipboardIcon() {
   );
 }
 
+function TableIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 10h18M9 10v10" />
+    </svg>
+  );
+}
+
 function LogOutIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -64,6 +73,10 @@ export default function Navbar() {
         <NavLink to="/input" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
           <ClipboardIcon />
           <span>Catat Data</span>
+        </NavLink>
+        <NavLink to="/data" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+          <TableIcon />
+          <span>Data Kasus</span>
         </NavLink>
       </nav>
       <div className="header-account">

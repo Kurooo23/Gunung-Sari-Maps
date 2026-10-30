@@ -14,9 +14,9 @@ import App from './App.jsx'
 if (typeof window !== 'undefined' && window.trustedTypes?.createPolicy) {
   try {
     window.trustedTypes.createPolicy('default', {
-      createHTML: (s) => s,
-      createScript: (s) => s,
-      createScriptURL: (s) => s,
+      createHTML: (htmlString) => htmlString,
+      createScript: (scriptContent) => scriptContent,
+      createScriptURL: (scriptUrl) => scriptUrl,
     })
   } catch {
     // Policy 'default' udah pernah dibuat (mis. oleh script lain) -- aman

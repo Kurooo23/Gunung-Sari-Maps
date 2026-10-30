@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { AuthContext } from "./AuthContext";
 
-let supabasePromise;
-function getSupabase() {
-  if (!supabasePromise) {
-    supabasePromise = import("./supabase").then((m) => m.supabase);
+let supabaseClientPromise;
+function getSupabaseClient() {
+  if (!supabaseClientPromise) {
+    supabaseClientPromise = import("./supabase").then(
+      (supabaseModule) => supabaseModule.supabase
+    );
   }
-  return supabasePromise;
+  return supabaseClientPromise;
 }
 
-async function checkEmailExists(supabase, email) {
-  const { data, error } = await supabase.rpc("check_email_exists", {
+async function checkEmailExists(supabaseClient, email) {
+  const { data, error } = await supabaseClient.rpc("check_email_exists", {
     p_email: email,
   });
 
@@ -28,34 +30,34 @@ export function AuthProvider({ children }) {
   const unsubscribeRef = useRef(null);
 
   useEffect(() => {
-    let mounted = true;
+    let isMounted = true;
 
-    getSupabase().then((supabase) => {
-      if (!mounted) return;
+    getSupabaseClient().then((supabaseClient) => {
+      if (!isMounted) return;
 
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!mounted) return;
+      supabaseClient.auth.getSession().then(({ data: { session } }) => {
+        if (!isMounted) return;
         setUser(session?.user ?? null);
         setLoading(false);
       });
 
-      const { data: listener } = supabase.auth.onAuthStateChange(
-        (_event, session) => {
+      const { data: authListener } = supabaseClient.auth.onAuthStateChange(
+        (_authEvent, session) => {
           setUser(session?.user ?? null);
         }
       );
-      unsubscribeRef.current = () => listener.subscription.unsubscribe();
+      unsubscribeRef.current = () => authListener.subscription.unsubscribe();
     });
 
     return () => {
-      mounted = false;
+      isMounted = false;
       unsubscribeRef.current?.();
     };
   }, []);
 
   const signIn = async (email, password) => {
-    const supabase = await getSupabase();
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const supabaseClient = await getSupabaseClient();
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
       email,
       password,
     });
@@ -75,10 +77,10 @@ export function AuthProvider({ children }) {
       };
     }
 
-    const message = (error.message || "").toLowerCase();
+    const errorMessage = (error.message || "").toLowerCase();
 
-    if (message.includes("invalid login credentials")) {
-      const emailExists = await checkEmailExists(supabase, email);
+    if (errorMessage.includes("invalid login credentials")) {
+      const emailExists = await checkEmailExists(supabaseClient, email);
 
       if (emailExists === null) {
         return { success: false, errorCode: "invalid_credentials", error: error.message };
@@ -91,15 +93,15 @@ export function AuthProvider({ children }) {
       };
     }
 
-    if (message.includes("email not confirmed")) {
+    if (errorMessage.includes("email not confirmed")) {
       return { success: false, errorCode: "email_not_confirmed", error: error.message };
     }
 
-    if (message.includes("rate limit") || message.includes("too many")) {
+    if (errorMessage.includes("rate limit") || errorMessage.includes("too many")) {
       return { success: false, errorCode: "too_many_requests", error: error.message };
     }
 
-    if (message.includes("fetch") || message.includes("network")) {
+    if (errorMessage.includes("fetch") || errorMessage.includes("network")) {
       return { success: false, errorCode: "network_error", error: error.message };
     }
 
@@ -107,8 +109,8 @@ export function AuthProvider({ children }) {
   };
 
   const signOut = async () => {
-    const supabase = await getSupabase();
-    await supabase.auth.signOut();
+    const supabaseClient = await getSupabaseClient();
+    await supabaseClient.auth.signOut();
     setUser(null);
   };
 

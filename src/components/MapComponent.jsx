@@ -13,14 +13,14 @@ function FitBounds({ geoJsonData }) {
   const map = useMap();
 
   useEffect(() => {
-    const fit = () => {
+    const fitMapToBounds = () => {
       map.invalidateSize();
       map.fitBounds(imageBounds, { padding: [0, 0] });
     };
 
-    fit();
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
+    fitMapToBounds();
+    window.addEventListener("resize", fitMapToBounds);
+    return () => window.removeEventListener("resize", fitMapToBounds);
   }, [geoJsonData, map]);
 
   return null;
@@ -30,9 +30,9 @@ export default function MapComponent({ geoJsonData, onFeatureClick, diseaseName 
   const defaultCenter = [-1.2569, 116.8468];
   const defaultZoom = 16;
   const mapReference =
-  typeof window !== "undefined" && window.matchMedia("(max-width: 480px)").matches
-    ? "/peta-map-bg-mobile.webp"
-    : "/peta-map-bg.webp";
+    typeof window !== "undefined" && window.matchMedia("(max-width: 480px)").matches
+      ? "/peta-map-bg-mobile.webp"
+      : "/peta-map-bg.webp";
 
   return (
     <MapContainer
@@ -54,18 +54,20 @@ export default function MapComponent({ geoJsonData, onFeatureClick, diseaseName 
         data={geoJsonData}
         style={(feature) => getStyle(feature)}
         onEachFeature={(feature, layer) => {
-          const caseCount = Number(feature.properties.case_count ?? feature.properties.stunting_count ?? 0);
+          const caseCount = Number(
+            feature.properties.case_count ?? feature.properties.stunting_count ?? 0
+          );
 
           layer.on({
-            mouseover: (e) => {
-              const target = e.target;
-              target.setStyle({
+            mouseover: (mouseEvent) => {
+              const targetLayer = mouseEvent.target;
+              targetLayer.setStyle({
                 weight: 2.5,
                 color: "#ffffff",
                 dashArray: "",
                 fillOpacity: 0.86,
               });
-              target.bringToFront();
+              targetLayer.bringToFront();
             },
             mouseout: () => {
               layer.setStyle(getStyle(feature));

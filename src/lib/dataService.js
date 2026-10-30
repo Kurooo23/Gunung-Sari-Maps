@@ -32,7 +32,7 @@ const DEFAULT_DISEASES = [
   { slug: "ibu_hamil", name: "Ibu Hamil", display_name: "Ibu Hamil" },
 ];
 
-const DISEASE_SLUGS = new Set(DEFAULT_DISEASES.map((d) => d.slug));
+const DISEASE_SLUGS = new Set(DEFAULT_DISEASES.map((disease) => disease.slug));
 
 const normalizeRTNumber = (value) => String(value).trim().padStart(2, "0");
 
@@ -205,8 +205,8 @@ export async function fetchRTData(kelurahan, period, diseaseSlug = "stunting") {
     }
 
     return toGeoJson(boundaries, cases, kelurahan, activeDisease);
-  } catch (err) {
-    console.error("[DataService] Error fetching data:", err.message);
+  } catch (error) {
+    console.error("[DataService] Error fetching data:", error.message);
     return kelurahan ? { type: "FeatureCollection", features: [] } : rtGeoJson;
   }
 }
@@ -248,40 +248,75 @@ export async function submitCaseData({ rtNumber, diseaseSlug, caseCount, period,
 
     if (error) throw error;
     return { success: true, error: null };
-  } catch (err) {
-    return { success: false, error: err.message };
+  } catch (error) {
+    return { success: false, error: error.message };
   }
 }
 
 /**
- * Ambil daftar entri kasus (mentah, dengan id) untuk satu jenis kasus,
- * dipakai untuk menampilkan tabel data tersimpan di Input Page
+ * Ambil daftar entri kasus (mentah, dengan id) untuk satu jenis kasus atau semua kasus ("all"),
+ * dipakai untuk menampilkan tabel data tersimpan di halaman Data Kasus
  * (mendukung Edit & Hapus).
  */
-export async function fetchCaseEntries({ kelurahan, diseaseSlug }) {
+export async function fetchCaseEntries({ kelurahan, diseaseSlug = "all" }) {
   if (!isSupabaseConfigured()) return [];
 
-  const caseTable = getCaseTableName(diseaseSlug || "stunting");
+  const targetDiseases =
+    !diseaseSlug || diseaseSlug === "all"
+      ? DEFAULT_DISEASES
+      : DEFAULT_DISEASES.filter((disease) => disease.slug === diseaseSlug);
+
+  const diseasesToFetch =
+    targetDiseases.length > 0
+      ? targetDiseases
+      : [{ slug: "stunting", name: "Stunting", display_name: "Stunting" }];
 
   try {
-    const caseTableExists = await tableExists(caseTable);
-    if (!caseTableExists) return [];
+    const results = await Promise.all(
+      diseasesToFetch.map(async (disease) => {
+        const caseTable = getCaseTableName(disease.slug);
+        const caseTableExists = await tableExists(caseTable);
+        if (!caseTableExists) return [];
 
-    let query = supabase
-      .from(caseTable)
-      .select("id, rt_number, case_count, period, notes, updated_at")
-      .order("period", { ascending: false })
-      .order("rt_number", { ascending: true });
+        let query = supabase
+          .from(caseTable)
+          .select("id, rt_number, case_count, period, notes, updated_at")
+          .order("period", { ascending: false })
+          .order("rt_number", { ascending: true });
 
-    if (kelurahan) {
-      query = query.eq("kelurahan", kelurahan);
-    }
+        if (kelurahan) {
+          query = query.eq("kelurahan", kelurahan);
+        }
 
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
-  } catch (err) {
-    console.error("[DataService] Error fetching case entries:", err.message);
+        const { data, error } = await query;
+        if (error) {
+          console.error(`[DataService] Error fetching ${caseTable}:`, error.message);
+          return [];
+        }
+
+        return (data || []).map((row) => ({
+          ...row,
+          disease_slug: disease.slug,
+          disease_name: disease.display_name || disease.name,
+        }));
+      })
+    );
+
+    return results.flat().sort((firstEntry, secondEntry) => {
+      const periodComparison = String(secondEntry.period || "").localeCompare(
+        String(firstEntry.period || "")
+      );
+      if (periodComparison !== 0) return periodComparison;
+
+      const rtComparison = Number(firstEntry.rt_number) - Number(secondEntry.rt_number);
+      if (rtComparison !== 0) return rtComparison;
+
+      return String(firstEntry.disease_name || "").localeCompare(
+        String(secondEntry.disease_name || "")
+      );
+    });
+  } catch (error) {
+    console.error("[DataService] Error fetching case entries:", error.message);
     return [];
   }
 }
@@ -314,8 +349,8 @@ export async function updateCaseData(id, diseaseSlug, { rtNumber, caseCount, per
 
     if (error) throw error;
     return { success: true, error: null };
-  } catch (err) {
-    return { success: false, error: err.message };
+  } catch (error) {
+    return { success: false, error: error.message };
   }
 }
 
@@ -337,8 +372,8 @@ export async function deleteCaseData(id, diseaseSlug) {
     const { error } = await supabase.from(caseTable).delete().eq("id", id);
     if (error) throw error;
     return { success: true, error: null };
-  } catch (err) {
-    return { success: false, error: err.message };
+  } catch (error) {
+    return { success: false, error: error.message };
   }
 }
 
@@ -359,12 +394,12 @@ export async function submitStuntingData({ rtNumber, stuntingCount, period, note
  */
 export async function getRTNumbers(kelurahan) {
   if (!isSupabaseConfigured()) {
-    return rtGeoJson.features.map((f) => f.properties.rt_number).sort();
+    return rtGeoJson.features.map((feature) => feature.properties.rt_number).sort();
   }
 
   const boundariesTable = await resolveTable(TABLE_CANDIDATES.boundaries);
   if (!boundariesTable) {
-    return kelurahan ? [] : rtGeoJson.features.map((f) => f.properties.rt_number).sort();
+    return kelurahan ? [] : rtGeoJson.features.map((feature) => feature.properties.rt_number).sort();
   }
 
   let query = supabase.from(boundariesTable).select("rt_number").order("rt_number");
@@ -374,11 +409,11 @@ export async function getRTNumbers(kelurahan) {
 
   if (error) {
     console.error("[DataService] Error fetching RT numbers:", error.message);
-    return kelurahan ? [] : rtGeoJson.features.map((f) => f.properties.rt_number).sort();
+    return kelurahan ? [] : rtGeoJson.features.map((feature) => feature.properties.rt_number).sort();
   }
 
   if (!data || data.length === 0) {
-    return kelurahan ? [] : rtGeoJson.features.map((f) => f.properties.rt_number).sort();
+    return kelurahan ? [] : rtGeoJson.features.map((feature) => feature.properties.rt_number).sort();
   }
 
   return data.map((row) => row.rt_number);

@@ -9,6 +9,7 @@ import "./App.css";
 
 const MapPage = lazy(() => import("./components/MapPage"));
 const InputPage = lazy(() => import("./components/InputPage"));
+const DataPage = lazy(() => import("./components/DataPage"));
 const DigitizerPage = lazy(() => import("./components/DigitizerPage"));
 
 function RouteFallback() {
@@ -46,6 +47,14 @@ function AppShell() {
               element={
                 <ProtectedRoute>
                   <InputPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/data"
+              element={
+                <ProtectedRoute>
+                  <DataPage />
                 </ProtectedRoute>
               }
             />

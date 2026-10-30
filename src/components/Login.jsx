@@ -25,7 +25,7 @@ function LockIcon() {
   );
 }
 
-function EyeIcon({ off }) {
+function EyeIcon({ isHidden }) {
   return (
     <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
       <path
@@ -35,7 +35,7 @@ function EyeIcon({ off }) {
         strokeLinejoin="round"
       />
       <circle cx="10" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.4" />
-      {off && <path d="M2.5 17.5 17.5 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />}
+      {isHidden && <path d="M2.5 17.5 17.5 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />}
     </svg>
   );
 }
@@ -60,6 +60,13 @@ function LeafIcon() {
 // viewBox dibuat portrait supaya mengisi panel penuh tinggi layar,
 // bukan sekadar ilustrasi kecil di dalam kartu.
 function GrowthSignature() {
+  const curveAnchorPoints = [
+    [30, 760],
+    [140, 560],
+    [230, 320],
+    [410, 60],
+  ];
+
   return (
     <svg
       className="growth-signature"
@@ -92,13 +99,8 @@ function GrowthSignature() {
         fill="none"
       />
 
-      {[
-        [30, 760],
-        [140, 560],
-        [230, 320],
-        [410, 60],
-      ].map(([cx, cy]) => (
-        <circle key={cx} cx={cx} cy={cy} r="6" fill="#ffffff" fillOpacity="0.85" />
+      {curveAnchorPoints.map(([circleX, circleY]) => (
+        <circle key={circleX} cx={circleX} cy={circleY} r="6" fill="#ffffff" fillOpacity="0.85" />
       ))}
 
       <circle className="growth-curve-dot" cx="410" cy="60" r="9" fill="#ffffff" />
@@ -150,8 +152,8 @@ export default function Login() {
     return <Navigate to={redirectTo} replace />;
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleFormSubmit = async (event) => {
+    event.preventDefault();
     setError("");
 
     if (!email || !password) {
@@ -170,6 +172,10 @@ export default function Login() {
 
     const redirectTo = location.state?.from?.pathname || "/peta";
     navigate(redirectTo, { replace: true });
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword((previousVisibility) => !previousVisibility);
   };
 
   return (
@@ -212,7 +218,7 @@ export default function Login() {
               <p>Gunakan akun yang diberikan oleh admin Puskesmas.</p>
             </div>
 
-            <form className="login-form" onSubmit={handleSubmit} noValidate>
+            <form className="login-form" onSubmit={handleFormSubmit} noValidate>
               <label className="login-label" htmlFor="login-email">
                 Email
                 <div className="login-input-wrap">
@@ -222,7 +228,7 @@ export default function Login() {
                     type="email"
                     className="login-input"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(event) => setEmail(event.target.value)}
                     placeholder="nama@puskesmas.go.id"
                     autoComplete="username"
                   />
@@ -238,17 +244,17 @@ export default function Login() {
                     type={showPassword ? "text" : "password"}
                     className="login-input login-input-password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(event) => setPassword(event.target.value)}
                     placeholder="********"
                     autoComplete="current-password"
                   />
                   <button
                     type="button"
                     className="login-eye-toggle"
-                    onClick={() => setShowPassword((v) => !v)}
+                    onClick={togglePasswordVisibility}
                     aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
                   >
-                    <EyeIcon off={showPassword} />
+                    <EyeIcon isHidden={showPassword} />
                   </button>
                 </div>
               </label>
@@ -281,6 +287,7 @@ export default function Login() {
       <p className="login-signature">
         Website ini dibuat oleh tim KKN 52 Universitas Mulawarman
       </p>
+      <p className="login-version">v 1.1.2026.30.10</p>
     </div>
   );
 }

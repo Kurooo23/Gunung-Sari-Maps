@@ -7,12 +7,12 @@ export default function Legend({ title = "Kasus" }) {
   const map = useMap();
 
   useEffect(() => {
-    const legend = L.control({ position: "bottomright" });
+    const legendControl = L.control({ position: "bottomright" });
 
-    legend.onAdd = function () {
-      const div = L.DomUtil.create("div", "legend-control");
+    legendControl.onAdd = function createLegendElement() {
+      const containerElement = L.DomUtil.create("div", "legend-control");
 
-      const grades = [
+      const legendItems = [
         { label: "0", color: getColor(0) },
         { label: "1 – 2", color: getColor(1) },
         { label: "3 >", color: getColor(3) },
@@ -21,32 +21,32 @@ export default function Legend({ title = "Kasus" }) {
       const titleElement = document.createElement("div");
       titleElement.className = "legend-title";
       titleElement.textContent = title;
-      div.appendChild(titleElement);
+      containerElement.appendChild(titleElement);
 
-      grades.forEach((g) => {
-        const item = document.createElement("div");
-        item.className = "legend-item";
+      legendItems.forEach((legendItem) => {
+        const itemElement = document.createElement("div");
+        itemElement.className = "legend-item";
 
-        const swatch = document.createElement("span");
-        swatch.className = "legend-color";
-        swatch.style.background = g.color;
+        const colorSwatch = document.createElement("span");
+        colorSwatch.className = "legend-color";
+        colorSwatch.style.background = legendItem.color;
 
-        const label = document.createElement("span");
-        label.className = "legend-label";
-        label.textContent = g.label;
+        const labelElement = document.createElement("span");
+        labelElement.className = "legend-label";
+        labelElement.textContent = legendItem.label;
 
-        item.appendChild(swatch);
-        item.appendChild(label);
-        div.appendChild(item);
+        itemElement.appendChild(colorSwatch);
+        itemElement.appendChild(labelElement);
+        containerElement.appendChild(itemElement);
       });
 
-      return div;
+      return containerElement;
     };
 
-    legend.addTo(map);
+    legendControl.addTo(map);
 
     return () => {
-      legend.remove();
+      legendControl.remove();
     };
   }, [map, title]);
 
